@@ -32,20 +32,26 @@ function toolchain_install
     if [ ! -d $PREFIX ]; then
         mkdir -p $PREFIX/ld
         chown -R `whoami`:`whoami` $PREFIX
-    fi;
+    fi
 
-    # Check if binutils sources are available, download it if needed
+    # Check if binutils sources are available, download if needed
     if [ ! -d $BINUTILS ]; then
         echo -e "Cloning $BINUTILS"
         git clone -b $BINUTILS https://git.aidenisik.scot/FreeChainXenon/binutils-gdb $BINUTILS || fail_with_info
-    fi;
+    fi
 
-    # Check if gcc sources are available, download it if needed
+    # Check if gcc sources are available, download if needed
     if [ ! -d $GCC ]; then
-        echo -e "Downloading $GCC_FILE"
+        echo -e "Cloning $GCC"
 #        git clone -b $GCC https://git.aidenisik.scot/FreeChainXenon/gcc $GCC || fail_with_info
-    fi;
+    fi
 
+    # Check if SynthXEX sources are available, download if needed
+    if [ ! -d SynthXEX ]; then
+	echo -e "Cloning SynthXEX"
+	git clone -b main https://git.aidenisik.scot/FreeChainXenon/SynthXEX SynthXEX || fail_with_info
+    fi
+    
     rm -rf build
     mkdir build
 
@@ -56,19 +62,29 @@ function toolchain_install
     echo -e "Building binutils (main/ppc64), this could take a while..."
     make $PARALLEL 2>&1 >> $LOGFILE || fail_with_info
     make install 2>&1 >> $LOGFILE || fail_with_info
-    rm -rf *;
-   
+    rm -rf *
+
+    # Build binutils (PE linker)
     echo -e "Configuring binutils (ld/mingw)..."
     ../$BINUTILS/configure --target=$LD_TARGET --prefix=$PREFIX/ld  --enable-multilib --disable-nls --disable-werror >> $LOGFILE 2>&1 || fail_with_info
     echo -e "Building binutils (ld/mingw), this could take a while..."
     make $PARALLEL 2>&1 >> $LOGFILE || fail_with_info
     make install 2>&1 >> $LOGFILE || fail_with_info
     cd ..
-    rm -rf build/*;
+    rm -rf build/*
 
     echo -e "Correcting names and moving mingw linker to main directory..."
     rename 's/powerpc64-linux-gnu/fcx/' $FREECHAINXENON/bin/*
     cp $PREFIX/ld/bin/i686-w64-mingw32-ld $PREFIX/bin/fcx-ld
+
+    # Build SynthXEX
+    cd build
+    cp -r ../SynthXEX/* .
+    echo -e "Building SynthXEX..."
+    ./build.sh
+    cp synthxex $PREFIX/bin/synthxex
+    cd ..
+    rm -rf build/*
     
     echo -e "Done"
 
@@ -167,6 +183,17 @@ function check_build-essential
 	if [ "$answer" == "y" ]; then
 	    echo -e "Please wait while installing rename..."
 	    apt install -y rename >> $LOGFILE 2>&1
+	fi
+    fi;
+
+    dpkg -s nettle-dev >> $LOGFILE 2>&1
+    if [ $? -eq 1 ]; then
+	echo -e "nettle-dev was not detected on your system"
+	echo -e "Do you want this script to attempt to install it for you? (y/n)"
+	read answer >> $LOGFILE 2>&1
+	if [ "$answer" == "y" ]; then
+	    echo -e "Please wait while installing nettle-dev..."
+	    apt install -y nettle-dev >> $LOGFILE 2>&1
 	fi
     fi;
 }
