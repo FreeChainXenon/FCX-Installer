@@ -1,0 +1,188 @@
+#!/bin/bash
+
+# originally written by Uwe Hermann <uwe@hermann-uwe.de>, released as public domain.
+# changed for xenon by Felix Domke <tmbinc@elitedvb.net>, still public domain
+# changed for FreeChainXenon by Aiden Isik <aidenisik+git@member.fsf.org>, still public domain
+
+MAIN_TARGET=powerpc64-linux-gnu
+LD_TARGET=i686-w64-mingw32
+PREFIX=${PREFIX:-/usr/local/fcx} # Install location of your final toolchain
+PARALLEL=-j$(nproc)
+
+BINUTILS=binutils-2.43.1
+GCC=gcc-14.2.0
+
+# path to the logfile
+LOGFILE="`pwd`/build.log"
+
+# temp variables export
+export FREECHAINXENON="$PREFIX"
+export PATH="$PATH:$FREECHAINXENON/bin:$FREECHAINXENON/usr/bin"
+
+function fail_with_info()
+{
+    echo "[-] Script failed, check build.log!" >> /dev/stderr
+    exit 1
+}
+
+function toolchain_install
+{
+    # Make working directory
+    echo -e "Creating final toolchain directory: $PREFIX"
+    if [ ! -d $PREFIX ]; then
+        mkdir -p $PREFIX/ld
+        chown -R `whoami`:`whoami` $PREFIX
+    fi;
+
+    # Check if binutils sources are available, download it if needed
+    if [ ! -d $BINUTILS ]; then
+        echo -e "Cloning $BINUTILS"
+        git clone -b $BINUTILS https://git.aidenisik.scot/FreeChainXenon/binutils-gdb $BINUTILS || fail_with_info
+    fi;
+
+    # Check if gcc sources are available, download it if needed
+    if [ ! -d $GCC ]; then
+        echo -e "Downloading $GCC_FILE"
+#        git clone -b $GCC https://git.aidenisik.scot/FreeChainXenon/gcc $GCC || fail_with_info
+    fi;
+
+    rm -rf build
+    mkdir build
+
+    # Build binutils (main)
+    cd build
+    echo -e "Configuring binutils (main/ppc64)..."
+    ../$BINUTILS/configure --target=$MAIN_TARGET --prefix=$PREFIX  --enable-multilib --disable-nls --disable-werror >> $LOGFILE 2>&1 || fail_with_info
+    echo -e "Building binutils (main/ppc64), this could take a while..."
+    make $PARALLEL 2>&1 >> $LOGFILE || fail_with_info
+    make install 2>&1 >> $LOGFILE || fail_with_info
+    rm -rf *;
+   
+    echo -e "Configuring binutils (ld/mingw)..."
+    ../$BINUTILS/configure --target=$LD_TARGET --prefix=$PREFIX/ld  --enable-multilib --disable-nls --disable-werror >> $LOGFILE 2>&1 || fail_with_info
+    echo -e "Building binutils (ld/mingw), this could take a while..."
+    make $PARALLEL 2>&1 >> $LOGFILE || fail_with_info
+    make install 2>&1 >> $LOGFILE || fail_with_info
+    cd ..
+    rm -rf build/*;
+
+    echo -e "Correcting names and moving mingw linker to main directory..."
+    rename 's/powerpc64-linux-gnu/fcx/' $FREECHAINXENON/bin/*
+    cp $PREFIX/ld/bin/i686-w64-mingw32-ld $PREFIX/bin/fcx-ld
+    
+    echo -e "Done"
+
+    # Build GCC.
+
+#    cd build
+#    echo -e "Configuring gcc..."
+#    ../$GCC/configure --target=$TARGET --prefix=$PREFIX --with-libiconv-prefix=/opt/local -enable-interwork \
+#                      --enable-languages="c" --without-headers --disable-shared \
+#                      --with-newlib --disable-libmudflap --disable-libssp --disable-nls --disable-shared --without-headers \
+#                      --disable-decimal-float --enable-altivec\
+#                      --with-gmp=/opt/local --with-mpfr=/opt/local --with-cpu=cell >> $LOGFILE 2>&1 || fail_with_info
+#    echo -e "Building gcc, this could take a while..."
+#    make $PARALLEL all-gcc 2>&1 >> $LOGFILE || fail_with_info
+#    make install-gcc 2>&1 >> $LOGFILE || fail_with_info
+#    cd ..
+#    rm -rf build/*
+#    echo -e "Done"
+
+    rm -rf build
+    rm -rf $BINUTILS
+    rm -rf $GCC
+}
+
+function all_done
+{
+    RED='\e[0;31m'
+    NC='\e[0m'
+
+    echo
+    echo -e "All done, your FreeChainXenon toolchain is located here: $PREFIX"
+    echo
+    echo -e "${RED}Please add the following path to your login script (~/.bashrc)"
+    echo
+    echo -e "export FREECHAINXENON=\"$PREFIX\""
+    echo -e "export PATH=\"\$PATH:\$FREECHAINXENON/bin:\$FREECHAINXENON/usr/bin\""
+    echo -e "${NC}"
+}
+
+function check_build-essential
+{
+    echo -e "Ubuntu or Debian is detected."
+    dpkg -s build-essential >> $LOGFILE 2>&1
+
+    if [ $? -eq 1 ]; then
+	echo -e "The build-essential package was not detected on your system"
+	echo -e "To build the toolchain you need to download and install the build-essential package."
+	echo -e "Do you want this script to do it for you ? (y/n)"
+	read answer >> $LOGFILE 2>&1
+	if [ "$answer" == "y" ]; then
+	    echo -e "Please wait while installing build-essential..."
+	    apt install -y build-essential >> $LOGFILE 2>&1
+	fi
+    else
+	echo -e "The build-essential package was detected on your system"
+    fi
+
+    dpkg -s flex bison >> $LOGFILE 2>&1
+    if [ $? -eq 1 ]; then
+	echo -e "Flex / Bison were not detected on your system (binutils)"
+	echo -e "Do you want this script to attempt to install them for you? (y/n)"
+	read answer >> $LOGFILE 2>&1
+	if [ "$answer" == "y" ]; then
+	    echo -e "Please wait while installing flex and bison..."
+	    apt install -y flex bison >> $LOGFILE 2>&1
+	fi
+    fi;
+
+    dpkg -s gcc-multilib >> $LOGFILE 2>&1
+    if [ $? -eq 1 ]; then
+	echo -e "gcc-multilib was not detected on your system (binutils)"
+	echo -e "Do you want this script to attempt to install it for you? (y/n)"
+	read answer >> $LOGFILE 2>&1
+	if [ "$answer" == "y" ]; then
+	    echo -e "Please wait while installing gcc-multilib..."
+	    apt install -y gcc-multilib >> $LOGFILE 2>&1
+	fi
+    fi;
+
+    dpkg -s git >> $LOGFILE 2>&1
+    if [ $? -eq 1 ]; then
+	echo -e "git was not detected on your system"
+	echo -e "Do you want this script to attempt to install it for you? (y/n)"
+	read answer >> $LOGFILE 2>&1
+	if [ "$answer" == "y" ]; then
+	    echo -e "Please wait while installing git..."
+	    apt install -y git >> $LOGFILE 2>&1
+	fi
+    fi;
+
+    dpkg -s rename >> $LOGFILE 2>&1
+    if [ $? -eq 1 ]; then
+	echo -e "rename was not detected on your system"
+	echo -e "Do you want this script to attempt to install it for you? (y/n)"
+	read answer >> $LOGFILE 2>&1
+	if [ "$answer" == "y" ]; then
+	    echo -e "Please wait while installing rename..."
+	    apt install -y rename >> $LOGFILE 2>&1
+	fi
+    fi;
+}
+
+# start
+rm $LOGFILE &>/dev/null
+
+if [ "$1" == "toolchain" ]; then
+    if command -v apt-get &> /dev/null; then
+	check_build-essential
+    fi
+    toolchain_install
+    all_done
+else
+    echo -e "Usage:"
+    echo -e "\"$0 toolchain\" (install toolchain)"
+    echo
+    exit 0
+fi;
