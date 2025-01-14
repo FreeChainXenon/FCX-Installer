@@ -11,6 +11,7 @@ PARALLEL=-j$(nproc)
 
 BINUTILS=binutils-2.43.1
 GCC=gcc-14.2.0
+SYNTHXEX=synthxex-0.0.1
 
 # path to the logfile
 LOGFILE="`pwd`/build.log"
@@ -43,13 +44,13 @@ function toolchain_install
     # Check if gcc sources are available, download if needed
     if [ ! -d $GCC ]; then
         echo -e "Cloning $GCC"
-#        git clone -b $GCC https://git.aidenisik.scot/FreeChainXenon/gcc $GCC || fail_with_info
+	#        git clone -b $GCC https://git.aidenisik.scot/FreeChainXenon/gcc $GCC || fail_with_info
     fi
 
     # Check if SynthXEX sources are available, download if needed
-    if [ ! -d SynthXEX ]; then
+    if [ ! -d $SYNTHXEX ]; then
 	echo -e "Cloning SynthXEX"
-	git clone -b main https://git.aidenisik.scot/FreeChainXenon/SynthXEX SynthXEX || fail_with_info
+	git clone -b $SYNTHXEX https://git.aidenisik.scot/FreeChainXenon/SynthXEX $SYNTHXEX || fail_with_info
     fi
     
     rm -rf build
@@ -79,10 +80,10 @@ function toolchain_install
 
     # Build SynthXEX
     cd build
-    cp -r ../SynthXEX/* .
     echo -e "Building SynthXEX..."
-    ./build.sh
-    cp synthxex $PREFIX/bin/synthxex
+    cmake -DCMAKE_INSTALL_PREFIX=$PREFIX -DCMAKE_BUILD_TYPE=Release ../$SYNTHXEX >> $LOGFILE 2>&1 || fail_with_info
+    make $PARALLEL 2>&1 >> $LOGFILE || fail_with_info
+    make install 2>&1 >> $LOGFILE || fail_with_info
     cd ..
     rm -rf build/*
     
@@ -90,23 +91,24 @@ function toolchain_install
 
     # Build GCC.
 
-#    cd build
-#    echo -e "Configuring gcc..."
-#    ../$GCC/configure --target=$TARGET --prefix=$PREFIX --with-libiconv-prefix=/opt/local -enable-interwork \
-#                      --enable-languages="c" --without-headers --disable-shared \
-#                      --with-newlib --disable-libmudflap --disable-libssp --disable-nls --disable-shared --without-headers \
-#                      --disable-decimal-float --enable-altivec\
-#                      --with-gmp=/opt/local --with-mpfr=/opt/local --with-cpu=cell >> $LOGFILE 2>&1 || fail_with_info
-#    echo -e "Building gcc, this could take a while..."
-#    make $PARALLEL all-gcc 2>&1 >> $LOGFILE || fail_with_info
-#    make install-gcc 2>&1 >> $LOGFILE || fail_with_info
-#    cd ..
-#    rm -rf build/*
-#    echo -e "Done"
+    #    cd build
+    #    echo -e "Configuring gcc..."
+    #    ../$GCC/configure --target=$TARGET --prefix=$PREFIX --with-libiconv-prefix=/opt/local -enable-interwork \
+	#                      --enable-languages="c" --without-headers --disable-shared \
+	#                      --with-newlib --disable-libmudflap --disable-libssp --disable-nls --disable-shared --without-headers \
+	#                      --disable-decimal-float --enable-altivec\
+	#                      --with-gmp=/opt/local --with-mpfr=/opt/local --with-cpu=cell >> $LOGFILE 2>&1 || fail_with_info
+    #    echo -e "Building gcc, this could take a while..."
+    #    make $PARALLEL all-gcc 2>&1 >> $LOGFILE || fail_with_info
+    #    make install-gcc 2>&1 >> $LOGFILE || fail_with_info
+    #    cd ..
+    #    rm -rf build/*
+    #    echo -e "Done"
 
     rm -rf build
     rm -rf $BINUTILS
     rm -rf $GCC
+		rm -rf $SYNTHXEX
 }
 
 function all_done
@@ -194,6 +196,17 @@ function check_build-essential
 	if [ "$answer" == "y" ]; then
 	    echo -e "Please wait while installing nettle-dev..."
 	    apt install -y nettle-dev >> $LOGFILE 2>&1
+	fi
+    fi;
+
+    dpkg -s cmake >> $LOGFILE 2>&1
+    if [ $? -eq 1 ]; then
+	echo -e "cmake was not detected on your system"
+	echo -e "Do you want this script to attempt to install it for you? (y/n)"
+	read answer >> $LOGFILE 2>&1
+	if [ "$answer" == "y" ]; then
+	    echo -e "Please wait while installing cmake..."
+	    apt install -y cmake >> $LOGFILE 2>&1
 	fi
     fi;
 }
