@@ -44,7 +44,7 @@ function toolchain_install
     # Check if gcc sources are available, download if needed
     if [ ! -d $GCC ]; then
         echo -e "Cloning $GCC"
-	#        git clone -b $GCC https://git.aidenisik.scot/FreeChainXenon/gcc $GCC || fail_with_info
+	git clone -b $GCC https://git.aidenisik.scot/FreeChainXenon/gcc $GCC || fail_with_info
     fi
 
     # Check if SynthXEX sources are available, download if needed
@@ -74,10 +74,6 @@ function toolchain_install
     cd ..
     rm -rf build/*
 
-    echo -e "Correcting names and moving mingw linker to main directory..."
-    rename 's/powerpc64-linux-gnu/fcx/' $FREECHAINXENON/bin/*
-    cp $PREFIX/ld/bin/i686-w64-mingw32-ld $PREFIX/bin/fcx-ld
-
     # Build SynthXEX
     cd build
     echo -e "Building SynthXEX..."
@@ -90,25 +86,29 @@ function toolchain_install
     echo -e "Done"
 
     # Build GCC.
-
-    #    cd build
-    #    echo -e "Configuring gcc..."
-    #    ../$GCC/configure --target=$TARGET --prefix=$PREFIX --with-libiconv-prefix=/opt/local -enable-interwork \
-	#                      --enable-languages="c" --without-headers --disable-shared \
-	#                      --with-newlib --disable-libmudflap --disable-libssp --disable-nls --disable-shared --without-headers \
-	#                      --disable-decimal-float --enable-altivec\
-	#                      --with-gmp=/opt/local --with-mpfr=/opt/local --with-cpu=cell >> $LOGFILE 2>&1 || fail_with_info
-    #    echo -e "Building gcc, this could take a while..."
-    #    make $PARALLEL all-gcc 2>&1 >> $LOGFILE || fail_with_info
-    #    make install-gcc 2>&1 >> $LOGFILE || fail_with_info
-    #    cd ..
-    #    rm -rf build/*
-    #    echo -e "Done"
+    cd build
+    echo -e "Configuring gcc..."
+    ../$GCC/configure --target=$MAIN_TARGET --prefix=$PREFIX --with-libiconv-prefix=/opt/local -enable-interwork \
+	              --enable-languages="c" --without-headers --disable-shared \
+	              --with-newlib --disable-libmudflap --disable-libssp --disable-nls --disable-shared --without-headers \
+	              --disable-decimal-float --enable-altivec\
+	              --with-gmp=/opt/local --with-mpfr=/opt/local --with-cpu=cell >> $LOGFILE 2>&1 || fail_with_info
+    echo -e "Building gcc, this could take a while..."
+    make $PARALLEL all-gcc 2>&1 >> $LOGFILE || fail_with_info
+    make install-gcc 2>&1 >> $LOGFILE || fail_with_info
+    cd ..
+    rm -rf build/*
+    
+    echo -e "Correcting names and moving mingw linker to main directory..."
+    rename 's/powerpc64-linux-gnu/fcx/' $FREECHAINXENON/bin/*
+    cp $PREFIX/ld/bin/i686-w64-mingw32-ld $PREFIX/bin/fcx-ld
+    
+    echo -e "Done"
 
     rm -rf build
     rm -rf $BINUTILS
     rm -rf $GCC
-		rm -rf $SYNTHXEX
+    rm -rf $SYNTHXEX
 }
 
 function all_done
