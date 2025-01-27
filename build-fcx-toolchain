@@ -82,9 +82,12 @@ function toolchain_install
     make install 2>&1 >> $LOGFILE || fail_with_info
     cd ..
     rm -rf build/*
-    
-    echo -e "Done"
 
+    echo -e "Copying supporting files..."
+    cp -r supfiles/* $PREFIX
+
+    echo -e "Done"
+    
     # Build GCC.
     #cd build
     #echo -e "Configuring gcc..."
