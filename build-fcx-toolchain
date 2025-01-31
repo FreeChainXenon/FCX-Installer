@@ -12,6 +12,7 @@ PARALLEL=-j$(nproc)
 BINUTILS=binutils-2.43.1
 GCC=gcc-dev
 SYNTHXEX=synthxex-0.0.1
+SUPFILES=fcx-support-files
 
 # path to the logfile
 LOGFILE="`pwd`/build.log"
@@ -49,8 +50,13 @@ function toolchain_install
 
     # Check if SynthXEX sources are available, download if needed
     if [ ! -d $SYNTHXEX ]; then
-	echo -e "Cloning SynthXEX"
+	echo -e "Cloning $SYNTHXEX"
 	git clone -b $SYNTHXEX https://git.aidenisik.scot/FreeChainXenon/SynthXEX $SYNTHXEX || fail_with_info
+    fi
+
+    if [ ! -d $SUPFILES ]; then
+	echo -e "Cloning $SUPFILES"
+	git clone -b main https://git.aidenisik.scot/FreeChainXenon/FCX-Support-Files $SUPFILES || fail_with_info
     fi
 
     rm -rf build
@@ -84,7 +90,7 @@ function toolchain_install
     rm -rf build/*
 
     echo -e "Copying supporting files..."
-    cp -r supfiles/* $PREFIX
+    cp -r $SUPFILES/* $PREFIX
 
     echo -e "Done"
     
@@ -115,6 +121,7 @@ function toolchain_install
     rm -rf $BINUTILS
     rm -rf $GCC
     rm -rf $SYNTHXEX
+    rm -rf $SUPFILES
 }
 
 function all_done
