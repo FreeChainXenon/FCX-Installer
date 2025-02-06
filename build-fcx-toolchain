@@ -10,7 +10,7 @@ PREFIX=${PREFIX:-/usr/local/fcx} # Install location of your final toolchain
 PARALLEL=-j$(nproc)
 
 BINUTILS=binutils-2.43.1
-GCC=gcc-dev
+GCC=gcc-14.2.0
 SYNTHXEX=synthxex-0.0.1
 SUPFILES=fcx-support-files
 
@@ -32,7 +32,7 @@ function toolchain_install
     # Make working directory
     echo -e "Creating final toolchain directory: $PREFIX"
     if [ ! -d $PREFIX ]; then
-        mkdir -p $PREFIX/ld
+        mkdir -p $PREFIX
         chown -R `whoami`:`whoami` $PREFIX
     fi
 
@@ -45,7 +45,7 @@ function toolchain_install
     # Check if gcc sources are available, download if needed
     if [ ! -d $GCC ]; then
         echo -e "Cloning $GCC"
-	#git clone -b $GCC https://git.aidenisik.scot/FreeChainXenon/gcc $GCC || fail_with_info
+	git clone -b $GCC https://git.aidenisik.scot/FreeChainXenon/gcc $GCC || fail_with_info
     fi
 
     # Check if SynthXEX sources are available, download if needed
@@ -79,6 +79,20 @@ function toolchain_install
     make install 2>&1 >> $LOGFILE || fail_with_info
     cd ..
     rm -rf build/*
+    
+    # Build GCC.
+    cd build
+    echo -e "Configuring gcc..."
+    ../$GCC/configure --target=$TARGET_MAIN --prefix=$PREFIX --with-libiconv-prefix=/opt/local -enable-interwork \
+	              --enable-languages="c" --without-headers --disable-shared \
+	              --with-newlib --disable-libmudflap --disable-libssp --disable-nls --disable-shared --without-headers \
+	              --disable-decimal-float --enable-altivec\
+	              --with-gmp=/opt/local --with-mpfr=/opt/local --with-cpu=cell >> $LOGFILE 2>&1 || fail_with_info
+    echo -e "Building gcc, this could take a while..."
+    make $PARALLEL all-gcc 2>&1 >> $LOGFILE || fail_with_info
+    make install-gcc 2>&1 >> $LOGFILE || fail_with_info
+    cd ..
+    rm -rf build/*
 
     # Build SynthXEX
     cd build
@@ -89,33 +103,11 @@ function toolchain_install
     cd ..
     rm -rf build/*
 
+    # Copy supporting toolchain files (linker scripts etc)
     echo -e "Copying supporting files..."
     cp -r $SUPFILES/* $PREFIX
 
     echo -e "Done"
-    
-    # Build GCC.
-    #cd build
-    #echo -e "Configuring gcc..."
-    #../$GCC/configure --target=$TARGET --prefix=$PREFIX --with-libiconv-prefix=/opt/local -enable-interwork \
-#	              --enable-languages="c" --without-headers --disable-shared \
-#	              --with-newlib --disable-libmudflap --disable-libssp --disable-nls --disable-shared --without-headers \
-#	              --disable-decimal-float --enable-altivec\
-#	              --with-gmp=/opt/local --with-mpfr=/opt/local --with-cpu=cell >> $LOGFILE 2>&1 || fail_with_info
-    #echo -e "Building gcc, this could take a while..."
-    #make $PARALLEL all-gcc 2>&1 >> $LOGFILE || fail_with_info
-    #make install-gcc 2>&1 >> $LOGFILE || fail_with_info
-    #cd ..
-    #rm -rf build/*
-
-    #echo -e "Correcting GCC name (temporary)"
-    #rename 's/powerpc64-linux-gnu/powerpc64-fcx-xenon/' $FREECHAINXENON/bin/*
-   
-#    echo -e "Correcting names and moving mingw linker to main directory..."
-#    rename 's/powerpc64-linux-gnu/fcx/' $FREECHAINXENON/bin/*
-#    cp $PREFIX/ld/bin/i686-w64-mingw32-ld $PREFIX/bin/fcx-ld
-#    
-    #echo -e "Done"
 
     rm -rf build
     rm -rf $BINUTILS
