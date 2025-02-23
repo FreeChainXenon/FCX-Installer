@@ -11,7 +11,7 @@ PARALLEL=-j$(nproc)
 
 BINUTILS=binutils-2.43.1
 GCC=gcc-14.2.0
-SYNTHXEX=synthxex-0.0.1
+SYNTHXEX=synthxex-0.0.2
 SUPFILES=fcx-support-files
 
 # path to the logfile
